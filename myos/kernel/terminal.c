@@ -1,38 +1,39 @@
-// kernel/terminal.c
+// terminal.c
 #include "terminal.h"
+#include <stdint.h>
 
-static uint16_t* const VGA_BUFFER = (uint16_t*) 0xB8000;
-static size_t terminal_row;
-static size_t terminal_column;
-static uint8_t terminal_color;
-
-void terminal_initialize(void) {
-    terminal_row = 0;
-    terminal_column = 0;
-    terminal_color = (0 /*Schwarz*/ << 4) | 15 /*Weiß*/;
-    for (size_t y = 0; y < 25; y++) {
-        for (size_t x = 0; x < 80; x++) {
-            VGA_BUFFER[y * 80 + x] = (uint16_t)(' ' | terminal_color << 8);
-        }
-    }
-}
+static uint16_t* video_memory = (uint16_t*)0xB8000;
+static size_t row = 0;
+static size_t col = 0;
+static uint8_t color = 0x0F;
 
 void terminal_putchar(char c) {
     if (c == '\n') {
-        terminal_column = 0;
-        if (++terminal_row == 25) terminal_row = 0;
+        col = 0;
+        if (++row == 25) row = 0;
         return;
     }
-    VGA_BUFFER[terminal_row * 80 + terminal_column] =
-        (uint16_t)(c | terminal_color << 8);
-    if (++terminal_column == 80) {
-        terminal_column = 0;
-        if (++terminal_row == 25) terminal_row = 0;
+
+    const size_t index = row * 80 + col;
+    video_memory[index] = (color << 8) | c;
+
+    if (++col == 80) {
+        col = 0;
+        if (++row == 25) row = 0;
     }
 }
 
-void terminal_writestring(const char* str) {
-    for (size_t i = 0; str[i] != '\0'; i++) {
-        terminal_putchar(str[i]);
+void terminal_initialize(void) {
+    for (size_t y = 0; y < 25; y++) {
+        for (size_t x = 0; x < 80; x++) {
+            const size_t index = y * 80 + x;
+            video_memory[index] = (color << 8) | ' ';
+        }
     }
+    row = 0;
+    col = 0;
+}
+
+void terminal_writestring(const char* str) {
+    while (*str) terminal_putchar(*str++);
 }
